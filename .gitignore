@@ -1,0 +1,12 @@
+# Installed dependencies and the packager's output.
+node_modules/
+release/
+
+# The checkout an installed copy opens on: written by
+# `npm run installer -- --bake-root <path>`, and specific to whoever built it.
+project-root.json
+
+# The checkout-shaped folder the CI smoke test creates.
+.verify-project/
+
+*.log

@@ -1,0 +1,11 @@
+# Check every text file out with LF on every platform.
+#
+# Prettier is configured with `endOfLine: "lf"`, so under Git's default
+# core.autocrlf=true on Windows the sources would check out with CRLF and
+# `prettier --check` would fail on an untouched clone. Normalizing here keeps
+# the working tree byte-identical on macOS, Linux and Windows.
+* text=auto eol=lf
+
+# Assets Git must never rewrite.
+*.png binary
+*.ico binary

@@ -1,0 +1,29 @@
+{
+  "name": "ios-studio",
+  "productName": "iOS studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Windows window for the God's Eye View iOS studio panel: builds, signs and installs the iOS shell from a checkout.",
+  "main": "main.mjs",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Neo690"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Neo690/ios-studio.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "icon": "node build-icon.mjs",
+    "installer": "node build-installer.mjs",
+    "unpacked": "node build-installer.mjs --dir",
+    "shortcut": "node scripts/desktop-shortcut.mjs",
+    "test": "node --test scripts/desktop-shortcut.test.mjs"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.12"
+  }
+}

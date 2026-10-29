@@ -1,0 +1,97 @@
+name: iOS studio app
+
+# This repository is one Windows application, so every change builds it: the
+# packaged copy has to start its panel, answer for itself with `--verify`, and
+# produce an installer. A Windows runner is the only place that can be proved,
+# which is why this project lives outside the repository whose Linux CI could
+# never have caught an asar path or the ELECTRON_RUN_AS_NODE hand-off breaking.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-studio-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package and smoke-test the app
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: '1'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      # Before anything is downloaded: what the shortcut points at is a decision
+      # worth testing, and testing it costs no dependencies.
+      - name: Run the shortcut's tests
+        run: npm test
+
+      - name: Install the build dependencies
+        run: npm ci --no-audit --no-fund
+
+      # The icon is code, so it can fail. Running it here also proves the `.ico`
+      # the packager is about to read exists and parses.
+      - name: Draw the icon
+        run: node build-icon.mjs
+
+      # One build produces both the unpacked app and the installer.
+      - name: Package the app and the installer
+        run: node build-installer.mjs
+
+      # The app refuses to invent a project folder — it drives a God's Eye View
+      # checkout, and this repository is only the shell. So the smoke test hands
+      # it a folder shaped like one: a package.json and the panel script. Nothing
+      # runs from it; `--verify` only asks the panel what it sees.
+      - name: Build a checkout for the app to open
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .verify-project/scripts | Out-Null
+          '{ "name": "checkout-fixture", "private": true }' | Set-Content .verify-project/package.json
+          '' | Set-Content .verify-project/scripts/ios-studio.mjs
+
+      - name: Smoke-test the packaged app
+        shell: pwsh
+        run: |
+          $exe = 'release/win-unpacked/iOS studio.exe'
+          if (-not (Test-Path $exe)) { throw 'no packaged executable was produced' }
+          # `Start-Process -Wait -PassThru` rather than `& $exe`: the app is a
+          # GUI-subsystem executable, so calling it directly returns at once and
+          # leaves $LASTEXITCODE unset — a check against that empty value fails
+          # on every run, whatever the app answered.
+          $app = Start-Process -FilePath (Resolve-Path $exe) `
+            -ArgumentList '--verify', '--root=.verify-project' -Wait -PassThru
+          # The app writes why it failed into the profile it ran under.
+          $log = Join-Path $env:APPDATA 'iOS studio/logs/main.log'
+          if (Test-Path $log) { Get-Content $log -Tail 20 }
+          if ($app.ExitCode -ne 0) {
+            throw "the packaged app did not answer its panel (exit $($app.ExitCode))"
+          }
+          'the packaged app served the panel and reported its checks'
+
+      - name: Check the installer was produced
+        shell: pwsh
+        run: |
+          # The packager's own uninstaller stub carries "Setup" in its name while
+          # the build runs, so it is excluded explicitly: a check that passed on
+          # the uninstaller would report an installer that is not one.
+          $installer = Get-ChildItem 'release/*.exe' |
+            Where-Object { $_.Name -like '*Setup*' -and $_.Name -notlike '*uninstaller*' } |
+            Select-Object -First 1
+          if (-not $installer) { throw 'no installer was produced' }
+          '{0} ({1:N1} MiB)' -f $installer.Name, ($installer.Length / 1MB)

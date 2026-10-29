@@ -1,0 +1,52 @@
+# Windows app and installer for the iOS studio panel.
+#
+# This repository is the application, not the project it drives: the panel's
+# buttons run `npm run ...` and `xtool` inside a God's Eye View checkout, which
+# the app remembers by path (`project-root.json`, written by
+# `npm run installer -- --bake-root <path>`) and which the user can change at
+# runtime with File ▸ Open project folder….
+#
+# Windows only: the panel drives xtool through WSL, and that is the path this
+# project can test.
+
+appId: com.godseyeview.iosstudio
+productName: iOS studio
+copyright: God's Eye View — MIT
+
+directories:
+  output: release
+  buildResources: assets
+
+# The window, the icon, and — when the build was told to bake one — the folder
+# an installed copy opens on first run.
+files:
+  - main.mjs
+  - package.json
+  - assets/**
+  - project-root.json
+
+# The panel itself, kept in `server/`: the same files a checkout serves from
+# `scripts/`, so the window and the terminal path show one behaviour.
+extraResources:
+  - from: server
+    to: server
+
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName} Setup ${version}.exe
+
+nsis:
+  # Assisted, not silent: the user sees where it lands and can change it.
+  # Per-user by default, so it needs no administrator prompt.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: iOS studio
+  # The remembered project folder and the log survive an uninstall; the
+  # installed app itself does not.
+  deleteAppDataOnUninstall: false

@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>iOS studio</title>
+    <!-- Inline so the application window and the tab both get an icon without
+         a second file to serve or package. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230a84ff'/><rect x='21' y='13' width='22' height='38' rx='6' fill='none' stroke='white' stroke-width='3.5'/><circle cx='32' cy='45' r='2.6' fill='white'/></svg>"
+    />
+    <style>
+      /* Xcode's window, approximated with plain CSS: a chrome bar with traffic
+         lights, a navigator down the left, a tabbed editor, and the console as
+         one of those tabs. No assets, no fonts to download. */
+      /* Dark is Xcode's default; the light palette below is the same window
+         with Xcode's light appearance, chosen by the OS setting. */
+      :root {
+        color-scheme: light dark;
+        --page: #141414;
+        --window: #1e1e1e;
+        --chrome: #2d2d2d;
+        --chrome-line: #1a1a1a;
+        --strip: #2a2a2a;
+        --navigator: #232323;
+        --editor: #1f1f1f;
+        --console-bg: #181819;
+        --console-text: #d5d5d7;
+        --field: #1b1b1b;
+        --row-hover: #2c2c2e;
+        --line: #3a3a3c;
+        --line-soft: rgba(255, 255, 255, 0.06);
+        --text: #e4e4e4;
+        --muted: #8e8e93;
+        --accent: #0a84ff;
+        --accent-hover: #3d9bff;
+        --focus-ring: rgba(10, 132, 255, 0.25);
+        --btn: #3a3a3c;
+        --btn-hover: #48484a;
+        --btn-active: #545456;
+        --btn-border: transparent;
+        --tab-hover: #333335;
+        --tab-active: #3a3a3c;
+        --code-bg: rgba(255, 255, 255, 0.07);
+        --alert-bg: rgba(255, 214, 10, 0.11);
+        --alert-text: #f4d47c;
+        --ok: #30d158;
+        --bad: #ff453a;
+        --warn: #ffd60a;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --page: #d6d6d6;
+          --window: #efefef;
+          --chrome: #e3e3e3;
+          --chrome-line: #c8c8c8;
+          --strip: #e9e9e9;
+          --navigator: #eaeaea;
+          --editor: #ffffff;
+          --console-bg: #f6f6f6;
+          --console-text: #303033;
+          --field: #ffffff;
+          --row-hover: #dcdcdc;
+          --line: #c6c6c8;
+          --line-soft: rgba(0, 0, 0, 0.07);
+          --text: #1d1d1f;
+          --muted: #6e6e73;
+          --accent: #007aff;
+          --accent-hover: #3395ff;
+          --focus-ring: rgba(0, 122, 255, 0.22);
+          --btn: #f7f7f7;
+          --btn-hover: #ececec;
+          --btn-active: #e0e0e0;
+          --btn-border: #c6c6c8;
+          --tab-hover: #dedede;
+          --tab-active: #d6d6d6;
+          --code-bg: rgba(0, 0, 0, 0.06);
+          --alert-bg: rgba(255, 204, 0, 0.16);
+          --alert-text: #7a5300;
+          --ok: #1f9d3f;
+          --bad: #d70015;
+          --warn: #e0a300;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--text);
+        font:
+          13px/1.45 -apple-system,
+          BlinkMacSystemFont,
+          'SF Pro Text',
+          'Segoe UI',
+          system-ui,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .window {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--window);
+        overflow: hidden;
+      }
+
+      /* ── title bar ─────────────────────────────────────────────────────── */
+      .titlebar {
+        position: relative;
+        flex: none;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        background: var(--chrome);
+        border-bottom: 1px solid var(--chrome-line);
+      }
+      .lights {
+        display: flex;
+        gap: 8px;
+      }
+      .lights i {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        display: block;
+      }
+      .lights i:nth-child(1) {
+        background: #ff5f57;
+      }
+      .lights i:nth-child(2) {
+        background: #febc2e;
+      }
+      .lights i:nth-child(3) {
+        background: #28c840;
+      }
+      h1 {
+        position: absolute;
+        left: 0;
+        right: 0;
+        margin: 0;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+        pointer-events: none;
+      }
+
+      /* ── split ─────────────────────────────────────────────────────────── */
+      .split {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      .navigator {
+        flex: none;
+        width: 268px;
+        display: flex;
+        flex-direction: column;
+        background: var(--navigator);
+        border-right: 1px solid var(--chrome-line);
+        min-height: 0;
+      }
+      .navigator h2,
+      .pane h2 {
+        margin: 0;
+        flex: none;
+        padding: 7px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+        background: var(--strip);
+        border-bottom: 1px solid var(--chrome-line);
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 4px 0;
+        overflow: auto;
+      }
+      li {
+        display: grid;
+        grid-template-columns: 16px 1fr;
+        align-items: center;
+        gap: 2px 4px;
+        padding: 4px 12px;
+      }
+      li:hover {
+        background: var(--row-hover);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--bad);
+        justify-self: center;
+      }
+      .dot.ok {
+        background: var(--ok);
+      }
+      .name {
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .detail {
+        grid-column: 2;
+        color: var(--muted);
+        font-family: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+
+      /* ── editor area ───────────────────────────────────────────────────── */
+      .content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        background: var(--editor);
+      }
+      .toolbar {
+        flex: none;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: var(--chrome);
+        border-bottom: 1px solid var(--chrome-line);
+      }
+      .toolbar .host {
+        margin-left: auto;
+        color: var(--muted);
+        font-family: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
+        font-size: 11px;
+      }
+      button {
+        background: var(--btn);
+        color: var(--text);
+        border: 1px solid var(--btn-border);
+        border-radius: 5px;
+        padding: 5px 11px;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        background: var(--btn-hover);
+      }
+      button:active:not(:disabled) {
+        background: var(--btn-active);
+      }
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      button.primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* Xcode's navigator has a tab strip across its top; here the tabs choose
+         which pane the editor shows, so one pane fills the area instead of all
+         of them stacked into a scroll. */
+      .tabs {
+        flex: none;
+        display: flex;
+        gap: 2px;
+        padding: 6px 8px;
+        background: var(--strip);
+        border-bottom: 1px solid var(--chrome-line);
+      }
+      .tab {
+        background: transparent;
+        color: var(--muted);
+        padding: 4px 10px;
+        font-size: 11px;
+        border-radius: 4px;
+      }
+      .tab:hover:not(.active) {
+        background: var(--tab-hover);
+        color: var(--text);
+      }
+      .tab.active {
+        background: var(--tab-active);
+        color: var(--text);
+      }
+      .panes {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .pane {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 12px 16px 16px;
+      }
+      /* The log pane owns the whole height and scrolls on its own. */
+      .pane.log {
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        background: var(--console-bg);
+      }
+      .pane[hidden] {
+        display: none;
+      }
+      .pane h2 {
+        margin: -12px -16px 12px;
+      }
+      .pane.log h2 {
+        margin: 0;
+      }
+      .ipa {
+        color: var(--muted);
+        font-family: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
+        font-size: 11px;
+        margin-bottom: 10px;
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 11px;
+        margin: 10px 0 0;
+        max-width: 78ch;
+      }
+      code {
+        font-family: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
+        background: var(--code-bg);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .alert {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border-left: 3px solid var(--warn);
+        border-radius: 5px;
+        background: var(--alert-bg);
+        color: var(--alert-text);
+        font-size: 12px;
+      }
+      .alert[hidden] {
+        display: none;
+      }
+      .alert button {
+        margin-left: 8px;
+        padding: 3px 9px;
+      }
+
+      /* ── Apple ID form ─────────────────────────────────────────────────── */
+      .auth {
+        display: grid;
+        gap: 9px;
+        margin: 0 0 4px;
+        max-width: 420px;
+      }
+      .auth label {
+        display: grid;
+        gap: 4px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .auth input {
+        background: var(--field);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 6px 8px;
+        color: var(--text);
+        font: inherit;
+        font-size: 12px;
+      }
+      .auth input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--focus-ring);
+      }
+      .auth button {
+        justify-self: start;
+      }
+      /* `display: grid` above would otherwise beat the browser's [hidden]. */
+      .auth[hidden] {
+        display: none;
+      }
+
+      /* ── console ───────────────────────────────────────────────────────── */
+      pre {
+        flex: 1;
+        margin: 0;
+        padding: 10px 12px;
+        overflow: auto;
+        background: transparent;
+        color: var(--console-text);
+        font-family: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      /* A narrow window puts the navigator on top, above the toolbar. */
+      @media (max-width: 700px) {
+        .split {
+          flex-direction: column;
+        }
+        .navigator {
+          width: auto;
+          max-height: 34vh;
+          border-right: 0;
+          border-bottom: 1px solid var(--chrome-line);
+        }
+        .toolbar .host {
+          width: 100%;
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <header class="titlebar">
+        <span class="lights"><i></i><i></i><i></i></span>
+        <h1>iOS studio</h1>
+      </header>
+
+      <div class="split">
+        <aside class="navigator">
+          <div class="tabs" role="tablist" aria-label="Panes">
+            <button
+              class="tab active"
+              role="tab"
+              data-pane="signing"
+              aria-selected="true"
+            >
+              Signing
+            </button>
+            <button
+              class="tab"
+              role="tab"
+              data-pane="build"
+              aria-selected="false"
+            >
+              Build
+            </button>
+            <button
+              class="tab"
+              role="tab"
+              data-pane="log"
+              aria-selected="false"
+            >
+              Log
+            </button>
+          </div>
+          <h2>Toolchain</h2>
+          <ul id="checks"></ul>
+        </aside>
+
+        <main class="content">
+          <div class="toolbar">
+            <button data-task="build">Build web</button>
+            <button data-task="payload">Stage payload</button>
+            <button data-task="ipa">Build .ipa</button>
+            <button data-task="verify">Verify plists</button>
+            <button data-task="install" class="primary" id="install">
+              Install on device
+            </button>
+            <button id="reveal">Open output folder</button>
+            <button id="refresh">Refresh</button>
+            <span class="host" id="host">connecting…</span>
+          </div>
+
+          <div class="panes">
+            <section class="pane" data-pane="signing">
+              <h2>Signing</h2>
+              <form id="login-form" class="auth">
+                <label>
+                  <span>Apple ID</span>
+                  <input
+                    id="login-user"
+                    type="email"
+                    autocomplete="username"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Password</span>
+                  <input
+                    id="login-pass"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                  />
+                </label>
+                <button type="submit" class="primary">Log in</button>
+              </form>
+              <form id="code-form" class="auth" hidden>
+                <label>
+                  <span>2FA code</span>
+                  <input
+                    id="login-code"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    required
+                  />
+                </label>
+                <button type="submit">Send code</button>
+              </form>
+              <p class="hint" id="login-hint">
+                Passed straight to <code>xtool auth login</code>, never stored.
+                Apple may ask for a two-factor code next.
+              </p>
+            </section>
+
+            <section class="pane" data-pane="build" hidden>
+              <h2>Artifact</h2>
+              <p class="alert" id="alert" hidden>
+                <span id="alert-text"></span>
+                <button data-task="install" id="alert-install" class="primary">
+                  Re-sign and install
+                </button>
+              </p>
+              <div class="ipa" id="ipa">no .ipa yet</div>
+              <p class="hint">
+                Signing needs an Apple ID: log in above, then use
+                <em>Install on device</em>, which runs
+                <code>xtool dev run --usb</code>. Unsigned, the .ipa can still
+                be signed on a phone-side tool such as Sideloadly or AltStore.
+              </p>
+            </section>
+            <section class="pane log" data-pane="log" hidden>
+              <h2>Console</h2>
+              <pre id="log">
+Ready. The buttons run the same commands as the npm scripts.</pre>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const checksEl = document.getElementById('checks');
+      const logEl = document.getElementById('log');
+      const ipaEl = document.getElementById('ipa');
+      const alertEl = document.getElementById('alert');
+      const alertTextEl = document.getElementById('alert-text');
+      const alertInstall = document.getElementById('alert-install');
+      const codeForm = document.getElementById('code-form');
+      const hostEl = document.getElementById('host');
+      const buttons = [...document.querySelectorAll('button[data-task]')];
+      const installButton = document.getElementById('install');
+      let installable = false;
+      let busy = false;
+
+      const say = (line) => {
+        logEl.textContent += (logEl.textContent ? '\n' : '') + line;
+        logEl.scrollTop = logEl.scrollHeight;
+      };
+
+      const tabs = [...document.querySelectorAll('.tab')];
+      const panes = [...document.querySelectorAll('.pane')];
+
+      /** Show one pane and mark its tab; Signing is the default. */
+      const showPane = (name) => {
+        for (const tab of tabs) {
+          const active = tab.dataset.pane === name;
+          tab.classList.toggle('active', active);
+          tab.setAttribute('aria-selected', String(active));
+        }
+        for (const pane of panes) pane.hidden = pane.dataset.pane !== name;
+      };
+
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => showPane(tab.dataset.pane));
+      }
+
+      const setBusy = (value) => {
+        busy = value;
+        for (const button of buttons) {
+          // Both install buttons (the toolbar one and the banner's) need an
+          // Apple ID session and a visible phone; the status line says which
+          // half is missing, so the button explains itself.
+          button.disabled =
+            busy || (button.dataset.task === 'install' && !installable);
+        }
+      };
+
+      /**
+       * The re-sign reminder. A free Apple ID's profile lasts seven days, and
+       * the last two are the ones worth acting on: once it lapses, the installed
+       * app stops launching and only a freshly signed build revives it. Nothing
+       * here signs anything — it names the command that does.
+       */
+      function showSignatureAlert(signature) {
+        if (!signature || !signature.expiresSoon) {
+          alertEl.hidden = true;
+          alertTextEl.textContent = '';
+          return;
+        }
+        alertEl.hidden = false;
+        alertTextEl.textContent = `Provisioning profile expires in ${signature.hoursLeft} h (${signature.expiresAt.slice(0, 10)}). Sign and install a fresh build now:`;
+      }
+
+      async function refresh() {
+        try {
+          const response = await fetch('/api/status', { cache: 'no-store' });
+          const data = await response.json();
+          hostEl.textContent = `host: ${data.host} · ${data.platform}`;
+          checksEl.innerHTML = '';
+          for (const check of data.checks) {
+            const li = document.createElement('li');
+            const dot = document.createElement('span');
+            dot.className = `dot${check.ok ? ' ok' : ''}`;
+            const name = document.createElement('span');
+            name.className = 'name';
+            name.textContent = check.name;
+            const detail = document.createElement('span');
+            detail.className = 'detail';
+            detail.textContent = check.detail || '—';
+            li.append(dot, name, detail);
+            checksEl.append(li);
+          }
+          installable = data.installable;
+          const installTitle = data.installable
+            ? `signs and installs onto ${data.device || 'the connected device'}`
+            : data.installBlockedBy;
+          installButton.title = installTitle;
+          alertInstall.title = data.installable
+            ? 're-signs with xtool dev run --usb and installs over USB'
+            : data.installBlockedBy;
+          // Re-apply the current state: a refresh must not re-enable buttons
+          // while a job is still running.
+          setBusy(busy);
+          ipaEl.textContent = data.ipa.exists
+            ? `ipa: ${(data.ipa.bytes / 1024 / 1024).toFixed(1)} MiB · ${new Date(data.ipa.modified).toLocaleString()}`
+            : 'no .ipa yet — Build .ipa writes one';
+          showSignatureAlert(data.signature);
+        } catch (error) {
+          hostEl.textContent = `cannot reach the studio server: ${error.message}`;
+        }
+      }
+
+      for (const button of buttons) {
+        button.addEventListener('click', async () => {
+          const task = button.dataset.task;
+          setBusy(true);
+          try {
+            const response = await fetch(`/api/run/${task}`, {
+              method: 'POST',
+            });
+            if (!response.ok) {
+              say(`✗ ${task}: ${await response.text()}`);
+              setBusy(false);
+            }
+          } catch (error) {
+            say(`✗ ${task}: ${error.message}`);
+            setBusy(false);
+          }
+        });
+      }
+
+      document.getElementById('refresh').addEventListener('click', refresh);
+
+      const postJson = async (pathname, body) => {
+        const response = await fetch(pathname, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return { ok: response.ok, text: await response.text() };
+      };
+
+      document
+        .getElementById('login-form')
+        .addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const username = document.getElementById('login-user').value.trim();
+          const password = document.getElementById('login-pass').value;
+          if (!username || !password) return;
+          setBusy(true);
+          const result = await postJson('/api/auth/login', {
+            username,
+            password,
+          });
+          // Cleared as soon as it is sent: the server holds it in memory only
+          // for the length of the login.
+          document.getElementById('login-pass').value = '';
+          if (!result.ok) {
+            say(`✗ login: ${result.text}`);
+            setBusy(false);
+          }
+        });
+
+      document
+        .getElementById('code-form')
+        .addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const code = document.getElementById('login-code').value.trim();
+          const result = await postJson('/api/auth/code', { code });
+          if (result.ok) document.getElementById('login-code').value = '';
+          else say(`✗ code: ${result.text}`);
+        });
+
+      document.getElementById('reveal').addEventListener('click', async () => {
+        const response = await fetch('/api/reveal', { method: 'POST' });
+        const data = await response.json();
+        say(
+          data.ok
+            ? `output folder: ${data.dir}`
+            : `output folder: ${data.reason}`,
+        );
+      });
+
+      const events = new EventSource('/api/logs');
+      events.onmessage = (event) => {
+        const line = event.data;
+        // "idle" and "running: …" are state, not output: they drive the buttons
+        // and stay out of the log.
+        if (line === 'idle') {
+          setBusy(false);
+          return;
+        }
+        if (line.startsWith('running: ')) {
+          setBusy(true);
+          return;
+        }
+        if (line === 'state: awaiting-code') {
+          codeForm.hidden = false;
+          document.getElementById('login-hint').textContent =
+            'Apple asked for a two-factor code. Enter the one it just sent.';
+          return;
+        }
+        if (line === 'state: idle') {
+          codeForm.hidden = true;
+          return;
+        }
+        // A job announces itself with "▶" (after a leading newline the server
+        // uses as a separator): switch to the Log so its output is visible
+        // without hunting for the tab.
+        if (line.trimStart().startsWith('▶ ')) showPane('log');
+        say(line);
+        if (line.startsWith('■ ')) {
+          setBusy(false);
+          refresh();
+        }
+      };
+      events.onerror = () => say('log stream disconnected; reload the page');
+
+      refresh();
+    </script>
+  </body>
+</html>

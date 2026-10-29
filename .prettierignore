@@ -1,0 +1,4 @@
+# Build output, dependencies and the machine-specific baked project.
+node_modules/
+release/
+project-root.json
