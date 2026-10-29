@@ -6,7 +6,8 @@ release/
 # `npm run installer -- --bake-root <path>`, and specific to whoever built it.
 project-root.json
 
-# The checkout-shaped folder the CI smoke test creates.
+# The checkout-shaped folder and the report the CI smoke test writes.
 .verify-project/
+verify-report.json
 
 *.log
