@@ -5,12 +5,17 @@ name: iOS studio app
 # produce an installer. A Windows runner is the only place that can be proved,
 # which is why this project lives outside the repository whose Linux CI could
 # never have caught an asar path or the ELECTRON_RUN_AS_NODE hand-off breaking.
+#
+# A push to main goes one step further and publishes that installer as a GitHub
+# release tagged with the package version, so the file a user downloads is one a
+# runner started and verified rather than one built on someone's machine.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
 
+# Read by default; only the release job is given the right to write, below.
 permissions:
   contents: read
 
@@ -106,3 +111,71 @@ jobs:
             Select-Object -First 1
           if (-not $installer) { throw 'no installer was produced' }
           '{0} ({1:N1} MiB)' -f $installer.Name, ($installer.Length / 1MB)
+          # Copied out under its own name so the release job uploads one known
+          # file: the packager keeps working files in `release/`, and a glob
+          # there could pick up a second executable later.
+          New-Item -ItemType Directory -Force release-asset | Out-Null
+          Copy-Item $installer.FullName release-asset/
+
+      # The installer crosses to the release job as a build artifact, so what
+      # gets published is the file this job just smoke-tested, not a second
+      # build of the same commit that could differ from it.
+      - name: Upload the installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: installer
+          path: release-asset/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  # Publishing is a separate job so the packaging job needs no write access to
+  # this repository — and gets none.
+  release:
+    name: Publish the installer as a release
+    needs: package
+    # A pull request is built to be checked, not to be published. Pushing to
+    # main is the release; a manual run of this workflow is the way to ship
+    # again without an empty commit.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Download the installer
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: installer
+          path: dist
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The tag *is* the package version, so a release cannot claim a
+          # version the app does not report.
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          asset=$(ls dist/*.exe)
+          if gh release view "$tag" > /dev/null 2>&1; then
+            # A second push on the same version replaces the asset instead of
+            # failing: the release is one per version, not one per commit.
+            echo "release $tag already exists: replacing its installer"
+            gh release upload "$tag" "$asset" --clobber
+          else
+            gh release create "$tag" "$asset" \
+              --target "$GITHUB_SHA" \
+              --title "iOS studio $version" \
+              --generate-notes
+          fi
+          # Read the result back: the upload's exit code says what was sent, not
+          # what the release now holds.
+          echo "published $(basename "$asset") to $tag"
+          gh release view "$tag" --json url,assets --jq '"url: " + .url, (.assets[] | "asset: " + .name + " (" + (.size|tostring) + " bytes)")'

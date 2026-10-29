@@ -99,6 +99,22 @@ Both builds run `build-icon.mjs` first, which draws `assets/icon.png` and
 `assets/icon.ico` from the panel's favicon — a PNG encoder and an ICO writer in
 plain Node, no image library.
 
+## Where the installer comes from
+
+You do not have to build it to get it. Every push to `main` builds the app on a
+Windows runner, smoke-tests the packaged copy, and publishes the installer as a
+GitHub release on the [releases page](https://github.com/Neo690/ios-studio/releases).
+
+The tag is the version in [package.json](package.json), so a release cannot
+claim a version the app does not report. Releasing again means bumping that
+version and pushing; pushing a second time on the same version replaces the
+release's installer rather than failing, and pull requests are built to be
+checked but never published. `workflow_dispatch` runs it by hand.
+
+The published file is the one the runner downloaded and read back after
+uploading — not a rebuild of the same commit, which could differ from the copy
+it verified.
+
 A built copy answers for itself, which is what CI checks:
 
 ```bash
@@ -130,7 +146,7 @@ unpacked build when nothing is installed, and reads the result back to be sure.
 | `build-installer.mjs`                  | icon → bake the checkout → electron-builder → check the artifact                                |
 | `electron-builder.yml`                 | what ships inside the app and how the NSIS installer behaves                                    |
 | `scripts/desktop-shortcut.mjs`         | recreates the desktop shortcut with the app's icon                                              |
-| `.github/workflows/ios-studio-app.yml` | builds, smoke-tests and packages on Windows                                                     |
+| `.github/workflows/ios-studio-app.yml` | builds, smoke-tests and packages on Windows, then publishes the installer as a release          |
 
 The panel server is started as a child of the app's own binary
 (`ELECTRON_RUN_AS_NODE`), so an installed copy needs no Node installation. That
