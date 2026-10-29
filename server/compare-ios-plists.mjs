@@ -3,7 +3,7 @@
 // Compare the `Info.plist` an xtool build produced with the values the Xcode
 // path would have written, so the two builds cannot quietly disagree.
 //
-// Why this exists: `ios/GodsEyeView/Info.plist` gets its identifier, executable,
+// Why this exists: `ios/<appName>/Info.plist` gets its identifier, executable,
 // module and version through `$(...)` build settings that only Xcode expands.
 // xtool needs a plain plist (`ios/Info.xtool.plist`) and fills the rest from
 // `xtool.yml` and `Package.swift`. Two sources for one bundle is exactly where
@@ -11,37 +11,26 @@
 // invisible until something reads it — TestFlight, the App Store, an update
 // check. This script reads the produced bundle and says so line by line.
 //
-// Usage:  node scripts/compare-ios-plists.mjs [path to a built Info.plist]
-// Default: ios/xtool/GodsEyeView.app/Info.plist
+// What is expected comes from the project (`server/project.mjs`): the bundle
+// name always, and the identifier, display name, version and minimum iOS only
+// when the project declares them. A value this file invented would just teach
+// the build to agree with a guess.
+//
+// Usage:  node server/compare-ios-plists.mjs [path to a built Info.plist]
+// Default: ios/xtool/<appName>.app/Info.plist
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DEFAULT_PLIST = path.join(
-  ROOT,
-  'ios',
-  'xtool',
-  'GodsEyeView.app',
-  'Info.plist',
-);
+import { readProjectConfig, requireApp } from './project.mjs';
 
-// What `ios/project.yml` declares for the Xcode target, which is the reference.
-const XCODE_VALUES = {
-  CFBundleIdentifier: 'com.godseye.view',
-  CFBundleExecutable: 'GodsEyeView',
-  CFBundleName: 'GodsEyeView',
-  CFBundleShortVersionString: '1.0',
-  CFBundleVersion: '1',
-  MinimumOSVersion: '16.0',
-  CFBundleDevelopmentRegion: 'en',
-  CFBundleDisplayName: "God's Eye View",
-  CFBundlePackageType: 'APPL',
-  LSRequiresIPhoneOS: true,
-  UIDeviceFamily: [1, 2],
-  UIRequiredDeviceCapabilities: ['arm64'],
-};
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+// The same override the rest of the panel honours: a packaged copy runs these
+// scripts against a checkout elsewhere on disk.
+const ROOT = path.resolve(
+  process.env.GEV_PROJECT_ROOT?.trim() || path.join(HERE, '..'),
+);
 
 // Keys only `Info.xtool.plist` carries; losing one changes how the app runs.
 const XTOOL_KEYS = [
@@ -52,8 +41,6 @@ const XTOOL_KEYS = [
   'UIStatusBarStyle',
   'UILaunchScreen',
 ];
-
-const SCENE_DELEGATE = 'GodsEyeView.SceneDelegate';
 
 /** Read one key out of the XML plist. Enough for scalars and flat arrays. */
 function reader(text) {
@@ -78,18 +65,44 @@ function reader(text) {
   };
 }
 
-export function compareIosPlists(plistPath = DEFAULT_PLIST) {
-  if (!existsSync(plistPath)) {
+/** The values `ios/project.yml` declares, as far as the project stated them. */
+export function expectedPlistValues(config) {
+  const app = requireApp(config, 'compare a plist');
+  const expected = {
+    CFBundleExecutable: app.appName,
+    CFBundleName: app.appName,
+    CFBundlePackageType: 'APPL',
+    CFBundleDevelopmentRegion: 'en',
+    LSRequiresIPhoneOS: true,
+    UIDeviceFamily: [1, 2],
+    UIRequiredDeviceCapabilities: ['arm64'],
+  };
+  if (app.bundleId) expected.CFBundleIdentifier = app.bundleId;
+  if (app.displayName) expected.CFBundleDisplayName = app.displayName;
+  if (app.version) {
+    expected.CFBundleShortVersionString = app.version;
+    expected.CFBundleVersion = '1';
+  }
+  if (app.minimumOs) expected.MinimumOSVersion = app.minimumOs;
+  return expected;
+}
+
+export function compareIosPlists(plistPath, config) {
+  const app = requireApp(config, 'compare a plist');
+  const file =
+    plistPath ||
+    path.join(app.root, 'ios', 'xtool', `${app.appName}.app`, 'Info.plist');
+  if (!existsSync(file)) {
     throw new Error(
-      `no built plist at ${path.relative(process.cwd(), plistPath)}: run \`cd ios && xtool dev build\` first`,
+      `no built plist at ${path.relative(process.cwd(), file)}: run \`cd ios && xtool dev build\` first`,
     );
   }
-  const text = readFileSync(plistPath, 'utf8');
+  const text = readFileSync(file, 'utf8');
   const value = reader(text);
   const lines = [];
   const failures = [];
 
-  for (const [key, expected] of Object.entries(XCODE_VALUES)) {
+  for (const [key, expected] of Object.entries(expectedPlistValues(app))) {
     const actual = value(key);
     const ok = JSON.stringify(actual) === JSON.stringify(expected);
     if (!ok) failures.push(key);
@@ -106,12 +119,16 @@ export function compareIosPlists(plistPath = DEFAULT_PLIST) {
     lines.push(`${present ? 'ok  ' : 'MISS'} ${key}`);
   }
 
-  const scene = value('UISceneDelegateClassName');
-  const sceneOk = scene === SCENE_DELEGATE;
-  if (!sceneOk) failures.push('UISceneDelegateClassName');
-  lines.push(
-    `${sceneOk ? 'ok  ' : 'DIFF'} UISceneDelegateClassName: ${JSON.stringify(scene)}`,
-  );
+  // The delegate class is named after the app's module, so it is compared only
+  // when the project builds one this panel knows how to name.
+  if (app.sceneDelegate) {
+    const scene = value('UISceneDelegateClassName');
+    const sceneOk = scene === app.sceneDelegate;
+    if (!sceneOk) failures.push('UISceneDelegateClassName');
+    lines.push(
+      `${sceneOk ? 'ok  ' : 'DIFF'} UISceneDelegateClassName: ${JSON.stringify(scene)}`,
+    );
+  }
 
   return { ok: failures.length === 0, failures, lines };
 }
@@ -121,7 +138,8 @@ const invoked = process.argv[1]
   : false;
 if (invoked) {
   try {
-    const result = compareIosPlists(process.argv[2] ?? DEFAULT_PLIST);
+    const config = readProjectConfig(ROOT);
+    const result = compareIosPlists(process.argv[2] ?? '', config);
     for (const line of result.lines) console.log(line);
     console.log(
       result.ok

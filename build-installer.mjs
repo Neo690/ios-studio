@@ -13,7 +13,7 @@
 //
 // Flags: --dir (unpacked only), --bake-root <path>, --no-bake-root, --skip-icon,
 //        --publish.
-// Usage:  npm run installer -- --bake-root "C:/path/to/gods-eye-view"
+// Usage:  npm run installer -- --bake-root "C:/path/to/the-ios-project"
 
 import { spawnSync } from 'node:child_process';
 import {

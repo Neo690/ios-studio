@@ -20,7 +20,7 @@
     "installer": "node build-installer.mjs",
     "unpacked": "node build-installer.mjs --dir",
     "shortcut": "node scripts/desktop-shortcut.mjs",
-    "test": "node --test scripts/desktop-shortcut.test.mjs"
+    "test": "node --test server/project.test.mjs server/compare-ios-plists.test.mjs scripts/desktop-shortcut.test.mjs"
   },
   "devDependencies": {
     "electron": "^45.0.0",

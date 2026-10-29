@@ -5,9 +5,13 @@
 // Three steps, in the order they depend on each other:
 //
 //   1. `npm run build`          — the Vite bundle the shell will serve;
-//   2. `npm run ios:payload`    — stage it into `ios/GodsEyeView/www` and write
+//   2. `npm run ios:payload`    — stage it into `ios/<appName>/www` and write
 //                                 `BuildConfig.swift`;
 //   3. `xtool dev build --ipa`  — compile the Swift shell and package it.
+//
+// The app's name and identity are not written here: they come from the project
+// (`server/project.mjs`, `ios/studio.json` or the `ios/` layout), so the same
+// file builds any iOS shell.
 //
 // xtool is a Linux tool. On Windows it runs inside WSL, so this script uses
 // `wsl.exe` there and calls it directly everywhere else. That difference is the
@@ -32,6 +36,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 
+import { readProjectConfig, requireApp } from './project.mjs';
+
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 // The Windows studio app ships these scripts inside its own resources and runs
 // them against a checkout elsewhere on disk, so the project root can be given
@@ -41,8 +47,6 @@ const ROOT = path.resolve(
   process.env.GEV_PROJECT_ROOT?.trim() || path.join(SCRIPTS_DIR, '..'),
 );
 const IOS_DIR = path.join(ROOT, 'ios');
-const IPA_PATH = path.join(IOS_DIR, 'xtool', 'GodsEyeView.ipa');
-const APP_PREFIX = 'Payload/GodsEyeView.app/';
 
 /** Run a command, streaming its output; throw on a non-zero status. */
 function run(command, args, { cwd = ROOT } = {}) {
@@ -195,7 +199,12 @@ export function readZipEntry(buffer, entry) {
  * `Payload/`, the console is inside the app, the version is the one we pinned,
  * and no signature claims something the build did not do.
  */
-export function verifyIpa(ipaPath, { expectVersion = '1.0' } = {}) {
+export function verifyIpa(
+  ipaPath,
+  { appName = '', bundleId = '', expectVersion = '' } = {},
+) {
+  requireApp({ appName, root: ROOT }, 'check an .ipa');
+  const appPrefix = `Payload/${appName}.app/`;
   if (!existsSync(ipaPath)) {
     throw new Error(
       `no .ipa at ${path.relative(ROOT, ipaPath)}: xtool reported success but wrote nothing`,
@@ -207,16 +216,16 @@ export function verifyIpa(ipaPath, { expectVersion = '1.0' } = {}) {
   const problems = [];
 
   const required = [
-    `${APP_PREFIX}GodsEyeView`,
-    `${APP_PREFIX}Info.plist`,
-    `${APP_PREFIX}www/index.html`,
+    `${appPrefix}${appName}`,
+    `${appPrefix}Info.plist`,
+    `${appPrefix}www/index.html`,
   ];
   for (const name of required) {
     if (!names.includes(name)) problems.push(`missing ${name}`);
   }
 
   const wwwFiles = names.filter(
-    (name) => name.startsWith(`${APP_PREFIX}www/`) && !name.endsWith('/'),
+    (name) => name.startsWith(`${appPrefix}www/`) && !name.endsWith('/'),
   );
   if (wwwFiles.length < 100) {
     problems.push(
@@ -233,7 +242,7 @@ export function verifyIpa(ipaPath, { expectVersion = '1.0' } = {}) {
 
   let plistSummary = '';
   const plistEntry = entries.find(
-    (entry) => entry.name === `${APP_PREFIX}Info.plist`,
+    (entry) => entry.name === `${appPrefix}Info.plist`,
   );
   if (plistEntry) {
     const plist = readZipEntry(buffer, plistEntry).toString('utf8');
@@ -245,13 +254,17 @@ export function verifyIpa(ipaPath, { expectVersion = '1.0' } = {}) {
       /<key>CFBundleIdentifier<\/key>\s*<string>([^<]*)<\/string>/.exec(
         plist,
       )?.[1];
-    if (version !== expectVersion) {
+    // Only what the project declared is checked: an identifier or a version
+    // the project never stated is not a fact this file is entitled to invent.
+    if (expectVersion && version !== expectVersion) {
       problems.push(
         `CFBundleShortVersionString is ${version}, expected ${expectVersion}`,
       );
     }
-    if (identifier !== 'com.godseye.view') {
-      problems.push(`CFBundleIdentifier is ${identifier}`);
+    if (bundleId && identifier !== bundleId) {
+      problems.push(
+        `CFBundleIdentifier is ${identifier}, expected ${bundleId}`,
+      );
     }
     plistSummary = `${identifier} ${version}`;
   }
@@ -401,9 +414,12 @@ export function describeSignature({
 
 /** Whether the archive on disk would install as it stands, and until when. */
 export function inspectIpaSignature(
-  ipaPath = IPA_PATH,
-  { now = new Date() } = {},
+  ipaPath,
+  { now = new Date(), appName = '' } = {},
 ) {
+  // Without a name any app inside `Payload/` will do: the signature and the
+  // profile are properties of the bundle, not of what it is called.
+  const appPrefix = appName ? `Payload/${appName}.app/` : 'Payload/';
   if (!existsSync(ipaPath)) {
     return {
       exists: false,
@@ -416,7 +432,7 @@ export function inspectIpaSignature(
   const inApp = (suffix) =>
     entries.find(
       (entry) =>
-        entry.name.startsWith(APP_PREFIX) && entry.name.endsWith(suffix),
+        entry.name.startsWith(appPrefix) && entry.name.endsWith(suffix),
     );
   const codeResources = inApp('_CodeSignature/CodeResources');
   const profileEntry = inApp('embedded.mobileprovision');
@@ -435,6 +451,8 @@ export function inspectIpaSignature(
 }
 
 export function buildIosIpa({ log = console.log } = {}) {
+  const project = requireApp(readProjectConfig(ROOT), 'build the .ipa');
+
   log('== building the web bundle ==');
   runNpmScript('build');
 
@@ -452,8 +470,12 @@ export function buildIosIpa({ log = console.log } = {}) {
   run(xtool.command, xtool.args, { cwd: xtool.cwd });
 
   log('\n== checking the archive ==');
-  const report = verifyIpa(IPA_PATH);
-  log(`ipa:    ${path.relative(ROOT, IPA_PATH)}`);
+  const report = verifyIpa(project.ipaPath, {
+    appName: project.appName,
+    bundleId: project.bundleId,
+    expectVersion: project.version,
+  });
+  log(`ipa:    ${path.relative(ROOT, project.ipaPath)}`);
   log(`size:   ${(report.bytes / 1024 / 1024).toFixed(1)} MiB`);
   log(`sha256: ${report.sha256}`);
   log(`plist:  ${report.plistSummary}`);

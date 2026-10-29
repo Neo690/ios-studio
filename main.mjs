@@ -401,6 +401,10 @@ async function verify() {
           port: serverPort,
           page: { ok: page.ok, bytes: html.length, title },
           status: {
+            // Which app the checkout named, and where that answer came from.
+            app: status.app,
+            configSource: status.configSource,
+            configProblem: status.configProblem,
             platform: status.platform,
             host: status.host,
             outputDir: status.outputDir,
@@ -417,7 +421,9 @@ async function verify() {
       page.ok &&
       html.includes('iOS studio') &&
       Array.isArray(status.checks) &&
-      status.checks.length > 0;
+      status.checks.length > 0 &&
+      // A project the panel cannot read is a failure, not a footnote.
+      !status.configProblem;
     stopServer();
     app.exit(ok ? 0 : 1);
   } catch (error) {

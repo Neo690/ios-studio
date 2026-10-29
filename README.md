@@ -14,13 +14,41 @@ icon, an installer and a desktop entry instead of a terminal and a browser tab.
 This repository is the shell; a project is the work. The buttons run the
 project's own npm scripts — `build`, `ios:payload`, `ios:ipa` — and
 `xtool dev run` inside the folder you point it at, then read the archive back.
-That folder has to be an iOS project exposing those entry points. The one this
-was written for is [God's Eye View](https://github.com/Neo690/gods-eye-view):
-its iOS shell, bundle staging and `.ipa` inspection are what the panel shows, so
-the plist comparison names its app. A project exposing the same three scripts
-and an `ios/` folder gets the build, stage, `.ipa` and install buttons; the
-verify button is the one piece still written around that app's plist, and says
-so when it is handed another.
+That folder has to be an iOS project exposing those entry points.
+
+Which app it builds is never written in this repository: the panel asks the
+project. See [the app the project builds](#the-app-the-project-builds).
+
+## The app the project builds
+
+`ios/studio.json`, at the root of the checkout, is where a project says what it
+is building:
+
+```json
+{
+  "appName": "MyApp",
+  "displayName": "My App",
+  "bundleId": "com.example.myapp",
+  "version": "1.0",
+  "minimumOs": "16.0",
+  "sceneDelegate": "MyApp.SceneDelegate"
+}
+```
+
+| Key             | Required | What it decides                                                                |
+| --------------- | -------- | ------------------------------------------------------------------------------ |
+| `appName`       | yes      | the bundle in `Payload/<appName>.app`, and `ios/xtool/<appName>.ipa`           |
+| `bundleId`      | no       | the `CFBundleIdentifier` an archive is checked against                         |
+| `version`       | no       | the `CFBundleShortVersionString` expected in the built plist                   |
+| `displayName`   | no       | the `CFBundleDisplayName` expected in the built plist                          |
+| `minimumOs`     | no       | the `MinimumOSVersion` expected in the built plist                             |
+| `sceneDelegate` | no       | the `UISceneDelegateClassName` expected; defaults to `<appName>.SceneDelegate` |
+
+Without that file the name is inferred from the layout: exactly one folder
+under `ios/` holding an `Info.plist` or a `www/` bundle is taken as the app, and
+the other keys stay unknown. Unknown keys are **not compared** — a check this
+app invented would only teach a build to agree with a guess. With no app to
+find, the panel says so instead of building something unnamed.
 
 ## What it needs
 
@@ -92,7 +120,8 @@ unpacked build when nothing is installed, and reads the result back to be sure.
 | Path                                   | What it is                                                                                      |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `main.mjs`                             | the Electron window: picks the project folder, starts the panel, owns the menu and the shutdown |
-| `server/`                              | the panel itself, copied from the project's `scripts/`                                          |
+| `server/`                              | the panel: the page, the `.ipa` build, the plist check                                          |
+| `server/project.mjs`                   | which app the checkout builds, from `ios/studio.json` or the `ios/` layout                      |
 | `build-icon.mjs`                       | the icon, drawn from the favicon                                                                |
 | `build-installer.mjs`                  | icon → bake the checkout → electron-builder → check the artifact                                |
 | `electron-builder.yml`                 | what ships inside the app and how the NSIS installer behaves                                    |
@@ -104,16 +133,16 @@ The panel server is started as a child of the app's own binary
 is also why a build has to be smoke-tested rather than assumed: the packaged
 paths are not the checkout's.
 
-## `server/` is a copy, deliberately
+## Where the panel came from
 
-The panel is maintained in God's Eye View, where `npm run ios:studio` still
-serves it; this repository carries a copy so the window works without a
-checkout for the page itself. When the panel changes there, copy the four files
-again:
+The page and the `.ipa` tooling started in God's Eye View, where
+`npm run ios:studio` still serves a copy for that project. This repository's
+copy is the **general** one: every app name comes from the checkout
+(`server/project.mjs`), so no file here mentions a particular app.
 
-```bash
-cp ../gods-eye-view/scripts/{ios-studio.mjs,ios-studio.html,build-ios-ipa.mjs,compare-ios-plists.mjs} server/
-```
+That is a deliberate fork, not a mirror: port changes from there by hand,
+keeping names out of the code, rather than copying the files back over. The
+`--verify` step in CI is what catches a port that stopped starting.
 
 The `--verify` step in CI is what catches the copy drifting far enough to stop
 starting.

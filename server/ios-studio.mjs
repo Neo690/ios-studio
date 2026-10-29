@@ -41,6 +41,7 @@ import {
   xtoolCommand,
 } from './build-ios-ipa.mjs';
 import { compareIosPlists } from './compare-ios-plists.mjs';
+import { readProjectConfig } from './project.mjs';
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 // The project this panel builds. From the repository it is the checkout the
@@ -53,7 +54,31 @@ const ROOT = path.resolve(
 const PAGE = path.join(SCRIPTS_DIR, 'ios-studio.html');
 const IOS_DIR = path.join(ROOT, 'ios');
 const OUTPUT_DIR = path.join(IOS_DIR, 'xtool');
-const IPA_PATH = path.join(OUTPUT_DIR, 'GodsEyeView.ipa');
+// Which app this checkout builds comes from the checkout, never from here: a
+// broken `ios/studio.json` must not stop the panel from opening, because the
+// page is where the problem gets reported.
+const PROJECT = (() => {
+  try {
+    return readProjectConfig(ROOT);
+  } catch (error) {
+    return {
+      root: ROOT,
+      source: '',
+      appName: '',
+      displayName: '',
+      bundleId: '',
+      version: '',
+      minimumOs: '',
+      sceneDelegate: '',
+      appDir: '',
+      wwwDir: '',
+      ipaPath: '',
+      appPrefix: '',
+      problem: error.message,
+    };
+  }
+})();
+const IPA_PATH = PROJECT.ipaPath;
 const DISTRO = process.env.GEV_WSL_DISTRO ?? 'Ubuntu';
 const PORT = Number(process.env.IOS_STUDIO_PORT ?? 47830);
 const HOST = '127.0.0.1';
@@ -169,7 +194,9 @@ function status() {
 
   // Separate from `ipa` because it answers a different question: not what was
   // written, but whether an iPhone would run it, and for how many days.
-  const signature = inspectIpaSignature(IPA_PATH);
+  const signature = inspectIpaSignature(IPA_PATH, {
+    appName: PROJECT.appName,
+  });
 
   return {
     platform: process.platform,
@@ -209,6 +236,11 @@ function status() {
         ? 'no iPhone is visible to WSL (usbipd attach)'
         : '',
     device: phone.name,
+    // What the panel would build, so a page can name the app instead of
+    // assuming which one this checkout is.
+    app: PROJECT.appName,
+    configSource: PROJECT.source,
+    configProblem: PROJECT.problem ?? '',
     ipa,
     signature,
     outputDir: OUTPUT_DIR,
@@ -241,19 +273,16 @@ let job = null;
  * Returns the path and a cleanup, or null when nothing has been built.
  */
 function plistUnderCheck() {
-  const built = path.join(
-    ROOT,
-    'ios',
-    'xtool',
-    'GodsEyeView.app',
-    'Info.plist',
-  );
-  if (existsSync(built)) return { plistPath: built, cleanup: () => {} };
+  const built = PROJECT.appName
+    ? path.join(OUTPUT_DIR, `${PROJECT.appName}.app`, 'Info.plist')
+    : '';
+  if (built && existsSync(built))
+    return { plistPath: built, cleanup: () => {} };
   if (!existsSync(IPA_PATH)) return null;
 
   const buffer = readFileSync(IPA_PATH);
   const entry = readZipEntries(buffer).find(
-    (candidate) => candidate.name === 'Payload/GodsEyeView.app/Info.plist',
+    (candidate) => candidate.name === `${PROJECT.appPrefix}Info.plist`,
   );
   if (!entry) return null;
   const dir = mkdtempSync(path.join(os.tmpdir(), 'gev-ipa-'));
@@ -276,13 +305,17 @@ function runVerify() {
   }
   const fromIpa = found.plistPath.includes(os.tmpdir());
   broadcast(
-    `  plist: ${fromIpa ? 'inside the .ipa' : 'ios/xtool/GodsEyeView.app'}`,
+    `  plist: ${fromIpa ? 'inside the .ipa' : `ios/xtool/${PROJECT.appName}.app`}`,
   );
   try {
-    const result = compareIosPlists(found.plistPath);
+    const result = compareIosPlists(found.plistPath, PROJECT);
     for (const line of result.lines) broadcast(`  ${line}`);
     if (existsSync(IPA_PATH)) {
-      const archive = verifyIpa(IPA_PATH);
+      const archive = verifyIpa(IPA_PATH, {
+        appName: PROJECT.appName,
+        bundleId: PROJECT.bundleId,
+        expectVersion: PROJECT.version,
+      });
       broadcast(
         `  archive: ${(archive.bytes / 1024 / 1024).toFixed(1)} MiB, ${archive.wwwFiles} files under www/, ${archive.signed} signature entries`,
       );
@@ -338,7 +371,11 @@ function startTask(name, res) {
     );
     if (name === 'ipa' && code === 0) {
       try {
-        const report = verifyIpa(IPA_PATH);
+        const report = verifyIpa(IPA_PATH, {
+          appName: PROJECT.appName,
+          bundleId: PROJECT.bundleId,
+          expectVersion: PROJECT.version,
+        });
         broadcast(
           `  archive: ${(report.bytes / 1024 / 1024).toFixed(1)} MiB, ${report.wwwFiles} files under www/, ${report.signed} signature entries`,
         );
