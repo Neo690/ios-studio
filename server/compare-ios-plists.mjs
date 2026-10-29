@@ -29,7 +29,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 // The same override the rest of the panel honours: a packaged copy runs these
 // scripts against a checkout elsewhere on disk.
 const ROOT = path.resolve(
-  process.env.GEV_PROJECT_ROOT?.trim() || path.join(HERE, '..'),
+  process.env.IOS_STUDIO_PROJECT?.trim() || path.join(HERE, '..'),
 );
 
 // Keys only `Info.xtool.plist` carries; losing one changes how the app runs.

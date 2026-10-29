@@ -52,13 +52,17 @@ find, the panel says so instead of building something unnamed.
 
 ## What it needs
 
-A checkout of that project with its `node_modules` installed, and `npm` on
+A checkout of an iOS project with its `node_modules` installed, and `npm` on
 `PATH`.
 
-For signing and installing, the machine also needs what
-[God's Eye View's iOS notes](https://github.com/Neo690/gods-eye-view/blob/main/ios/README.md)
-describe: WSL with the Swift toolchain, `xtool` and the Darwin SDK, an Apple ID
-session (`xtool auth login`) and an iPhone visible to WSL through `usbipd-win`.
+For signing and installing, the machine also needs:
+
+- WSL (on Windows) with the Swift toolchain, `xtool` and the Darwin SDK —
+  `swift --version`, `xtool --version` and `xtool sdk status` are what the
+  panel checks;
+- an Apple ID session (`xtool auth login`);
+- an iPhone visible to WSL, which on Windows means binding it with
+  [usbipd-win](https://learn.microsoft.com/en-us/windows/wsl/connect-usb).
 
 The window itself needs none of that to open: it reports what is missing in its
 navigator and leaves the buttons that depend on it disabled.
@@ -88,7 +92,7 @@ npm run installer    # release/iOS studio Setup <version>.exe
 fresh install lands on the right project instead of asking:
 
 ```bash
-npm run installer -- --bake-root "C:/path/to/gods-eye-view"
+npm run installer -- --bake-root "C:/path/to/the-ios-project"
 ```
 
 Both builds run `build-icon.mjs` first, which draws `assets/icon.png` and
@@ -98,7 +102,7 @@ plain Node, no image library.
 A built copy answers for itself, which is what CI checks:
 
 ```bash
-"release/win-unpacked/iOS studio.exe" --verify --root "C:/path/to/gods-eye-view"
+"release/win-unpacked/iOS studio.exe" --verify --root "C:/path/to/the-ios-project"
 ```
 
 It starts the panel, prints the project it opened, the port, the page size and
@@ -133,16 +137,13 @@ The panel server is started as a child of the app's own binary
 is also why a build has to be smoke-tested rather than assumed: the packaged
 paths are not the checkout's.
 
-## Where the panel came from
+## One tool, any iOS project
 
-The page and the `.ipa` tooling started in God's Eye View, where
-`npm run ios:studio` still serves a copy for that project. This repository's
-copy is the **general** one: every app name comes from the checkout
-(`server/project.mjs`), so no file here mentions a particular app.
-
-That is a deliberate fork, not a mirror: port changes from there by hand,
-keeping names out of the code, rather than copying the files back over. The
-`--verify` step in CI is what catches a port that stopped starting.
+No file here names an app: the name, the bundle identifier, the version and the
+plist expectations come from the checkout (`server/project.mjs`). The panel is
+portable because of that — the same window drives a different project by being
+pointed at it, and `--verify` in CI is what catches a build that stopped
+starting.
 
 The `--verify` step in CI is what catches the copy drifting far enough to stop
 starting.

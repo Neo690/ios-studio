@@ -1,17 +1,17 @@
 # Windows app and installer for the iOS studio panel.
 #
 # This repository is the application, not the project it drives: the panel's
-# buttons run `npm run ...` and `xtool` inside a God's Eye View checkout, which
-# the app remembers by path (`project-root.json`, written by
+# buttons run `npm run ...` and `xtool` inside an iOS checkout, which the app
+# remembers by path (`project-root.json`, written by
 # `npm run installer -- --bake-root <path>`) and which the user can change at
 # runtime with File ▸ Open project folder….
 #
 # Windows only: the panel drives xtool through WSL, and that is the path this
 # project can test.
 
-appId: com.godseyeview.iosstudio
+appId: com.neo690.iosstudio
 productName: iOS studio
-copyright: God's Eye View — MIT
+copyright: MIT
 
 directories:
   output: release

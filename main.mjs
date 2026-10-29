@@ -1,11 +1,9 @@
 // Standalone Windows window for the iOS studio panel.
 //
-// The panel is a copy of the one God's Eye View serves from `scripts/` (the
-// same file `npm run ios:studio` starts there), kept in `server/` beside this
-// shell and started here as a child of this binary through
-// `ELECTRON_RUN_AS_NODE`. An installed copy therefore needs no Node
-// installation, and the page in the window is the page a checkout's own panel
-// serves.
+// The panel is this repository's own (`server/`), started here as a child of
+// this binary through `ELECTRON_RUN_AS_NODE`. An installed copy therefore needs
+// no Node installation: the window carries both the page and the tools that
+// drive the phone.
 //
 // The window is the app; the checkout is the project. Its buttons run
 // `npm run ...` and `xtool` somewhere on disk, so this app remembers where: on
@@ -75,7 +73,7 @@ function isProject(directory) {
   return (
     Boolean(directory) &&
     existsSync(path.join(directory, 'package.json')) &&
-    existsSync(path.join(directory, 'scripts', 'ios-studio.mjs'))
+    existsSync(path.join(directory, 'ios'))
   );
 }
 
@@ -123,7 +121,7 @@ function bakedRoot() {
 async function resolveProjectRoot() {
   const candidates = [
     flagValue('--root'),
-    process.env.GEV_PROJECT_ROOT ?? '',
+    process.env.IOS_STUDIO_PROJECT ?? '',
     savedRoot(),
     bakedRoot(),
   ];
@@ -133,9 +131,8 @@ async function resolveProjectRoot() {
   if (VERIFY) return '';
 
   const answer = await dialog.showOpenDialog({
-    title: 'Choose the God’s Eye View folder',
-    message:
-      'The panel builds, signs and installs the iOS shell from a checkout.',
+    title: 'Choose the iOS project folder',
+    message: 'The panel builds, signs and installs the app from a checkout.',
     buttonLabel: 'Use this folder',
     properties: ['openDirectory'],
   });
@@ -168,7 +165,7 @@ function startServer(root, port) {
       ...process.env,
       // No Node on the machine is assumed: this executable is the runtime.
       ELECTRON_RUN_AS_NODE: '1',
-      GEV_PROJECT_ROOT: root,
+      IOS_STUDIO_PROJECT: root,
       IOS_STUDIO_PORT: String(port),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -297,7 +294,7 @@ function buildMenu() {
 /** Point the running window at another checkout, without a restart. */
 async function switchProject() {
   const answer = await dialog.showOpenDialog({
-    title: 'Choose the God’s Eye View folder',
+    title: 'Choose the iOS project folder',
     buttonLabel: 'Use this folder',
     properties: ['openDirectory'],
   });
@@ -305,8 +302,8 @@ async function switchProject() {
   if (answer.canceled || !isProject(picked)) {
     if (!answer.canceled) {
       dialog.showErrorBox(
-        'Not a God’s Eye View folder',
-        `${picked}\n\nThat folder has no package.json and scripts/ios-studio.mjs.`,
+        'Not an iOS project folder',
+        `${picked}\n\nThat folder has no package.json and no ios/ folder.`,
       );
     }
     return;

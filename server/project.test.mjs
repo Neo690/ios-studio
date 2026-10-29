@@ -50,9 +50,9 @@ test('studio.json names the app and derives the artefact paths', () => {
     fakeIo({
       files: {
         [configFile]: JSON.stringify({
-          appName: 'GodsEyeView',
-          displayName: "God's Eye View",
-          bundleId: 'com.godseye.view',
+          appName: 'MyApp',
+          displayName: 'My App',
+          bundleId: 'com.example.myapp',
           version: '1.0',
           minimumOs: '16.0',
         }),
@@ -60,18 +60,15 @@ test('studio.json names the app and derives the artefact paths', () => {
     }),
   );
 
-  assert.equal(config.appName, 'GodsEyeView');
-  assert.equal(config.bundleId, 'com.godseye.view');
+  assert.equal(config.appName, 'MyApp');
+  assert.equal(config.bundleId, 'com.example.myapp');
   assert.equal(config.version, '1.0');
   assert.equal(config.source, 'ios/studio.json');
-  assert.equal(config.appPrefix, 'Payload/GodsEyeView.app/');
-  assert.equal(
-    config.ipaPath,
-    path.join(root, 'ios', 'xtool', 'GodsEyeView.ipa'),
-  );
-  assert.equal(config.wwwDir, path.join(root, 'ios', 'GodsEyeView', 'www'));
+  assert.equal(config.appPrefix, 'Payload/MyApp.app/');
+  assert.equal(config.ipaPath, path.join(root, 'ios', 'xtool', 'MyApp.ipa'));
+  assert.equal(config.wwwDir, path.join(root, 'ios', 'MyApp', 'www'));
   // Not stated by the project, so derived from the module name.
-  assert.equal(config.sceneDelegate, 'GodsEyeView.SceneDelegate');
+  assert.equal(config.sceneDelegate, 'MyApp.SceneDelegate');
 });
 
 test('a declared scene delegate wins over the derived one', () => {
@@ -113,17 +110,14 @@ test('without a config, the app is the one app-shaped folder under ios/', () => 
     root,
     fakeIo({
       files: {
-        [path.join(root, 'ios', 'GodsEyeView', 'Info.plist')]: '<plist/>',
+        [path.join(root, 'ios', 'MyApp', 'Info.plist')]: '<plist/>',
       },
-      dirs: { [path.join(root, 'ios')]: ['GodsEyeView', 'xtool'] },
+      dirs: { [path.join(root, 'ios')]: ['MyApp', 'xtool'] },
     }),
   );
-  assert.equal(config.appName, 'GodsEyeView');
-  assert.equal(config.source, 'ios/GodsEyeView/');
-  assert.equal(
-    config.ipaPath,
-    path.join(root, 'ios', 'xtool', 'GodsEyeView.ipa'),
-  );
+  assert.equal(config.appName, 'MyApp');
+  assert.equal(config.source, 'ios/MyApp/');
+  assert.equal(config.ipaPath, path.join(root, 'ios', 'xtool', 'MyApp.ipa'));
 });
 
 test('a www/ bundle alone is enough to recognise an app', () => {

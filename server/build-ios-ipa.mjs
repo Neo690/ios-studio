@@ -27,7 +27,7 @@
 //         node scripts/build-ios-ipa.mjs
 //
 // Environment:
-//   GEV_WSL_DISTRO  WSL distribution to build in (default: Ubuntu)
+//   IOS_STUDIO_WSL_DISTRO  WSL distribution to build in (default: Ubuntu)
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -41,10 +41,10 @@ import { readProjectConfig, requireApp } from './project.mjs';
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 // The Windows studio app ships these scripts inside its own resources and runs
 // them against a checkout elsewhere on disk, so the project root can be given
-// explicitly. From the repository itself nothing is set and the root is still
-// the directory above `scripts/`.
+// explicitly (`IOS_STUDIO_PROJECT`). From a checkout nothing is set and the
+// root is the directory above the scripts.
 const ROOT = path.resolve(
-  process.env.GEV_PROJECT_ROOT?.trim() || path.join(SCRIPTS_DIR, '..'),
+  process.env.IOS_STUDIO_PROJECT?.trim() || path.join(SCRIPTS_DIR, '..'),
 );
 const IOS_DIR = path.join(ROOT, 'ios');
 
@@ -105,7 +105,7 @@ export function xtoolCommand(
   xtoolArgs,
   {
     platform = process.platform,
-    distro = process.env.GEV_WSL_DISTRO ?? 'Ubuntu',
+    distro = process.env.IOS_STUDIO_WSL_DISTRO ?? 'Ubuntu',
     iosDir = IOS_DIR,
   } = {},
 ) {

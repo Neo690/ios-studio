@@ -17,7 +17,7 @@
 // reachable from the network.
 //
 // Usage:  npm run ios:studio
-//         IOS_STUDIO_PORT=47830 GEV_WSL_DISTRO=Ubuntu npm run ios:studio
+//         IOS_STUDIO_PORT=47830 IOS_STUDIO_WSL_DISTRO=Ubuntu npm run ios:studio
 
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -46,10 +46,10 @@ import { readProjectConfig } from './project.mjs';
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 // The project this panel builds. From the repository it is the checkout the
 // script lives in; the packaged Windows app ships this file inside its own
-// resources and names the checkout with GEV_PROJECT_ROOT, so the buttons still
+// resources and names the checkout with IOS_STUDIO_PROJECT, so the buttons still
 // run `npm run ...` where the project actually is.
 const ROOT = path.resolve(
-  process.env.GEV_PROJECT_ROOT?.trim() || path.join(SCRIPTS_DIR, '..'),
+  process.env.IOS_STUDIO_PROJECT?.trim() || path.join(SCRIPTS_DIR, '..'),
 );
 const PAGE = path.join(SCRIPTS_DIR, 'ios-studio.html');
 const IOS_DIR = path.join(ROOT, 'ios');
@@ -79,7 +79,7 @@ const PROJECT = (() => {
   }
 })();
 const IPA_PATH = PROJECT.ipaPath;
-const DISTRO = process.env.GEV_WSL_DISTRO ?? 'Ubuntu';
+const DISTRO = process.env.IOS_STUDIO_WSL_DISTRO ?? 'Ubuntu';
 const PORT = Number(process.env.IOS_STUDIO_PORT ?? 47830);
 const HOST = '127.0.0.1';
 
@@ -285,7 +285,7 @@ function plistUnderCheck() {
     (candidate) => candidate.name === `${PROJECT.appPrefix}Info.plist`,
   );
   if (!entry) return null;
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'gev-ipa-'));
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ios-studio-ipa-'));
   const plistPath = path.join(dir, 'Info.plist');
   writeFileSync(plistPath, readZipEntry(buffer, entry));
   return {

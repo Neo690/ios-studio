@@ -56,15 +56,14 @@ jobs:
 
       # The app refuses to invent a project folder — it drives an iOS checkout,
       # and this repository is only the shell. So the smoke test hands it one:
-      # checkout-shaped, and naming its app, so the run exercises the config path
-      # (`ios/studio.json`) as well as the start-up. Nothing runs from it;
-      # `--verify` only asks the panel what it sees.
+      # a package.json, an `ios/` folder, and an `ios/studio.json` naming the app,
+      # so the run exercises the config path as well as the start-up. Nothing
+      # runs from it; `--verify` only asks the panel what it sees.
       - name: Build a checkout for the app to open
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force .verify-project/scripts,.verify-project/ios | Out-Null
+          New-Item -ItemType Directory -Force .verify-project/ios | Out-Null
           '{ "name": "checkout-fixture", "private": true }' | Set-Content .verify-project/package.json
-          '' | Set-Content .verify-project/scripts/ios-studio.mjs
           '{ "appName": "FixtureApp", "bundleId": "com.example.fixture" }' | Set-Content .verify-project/ios/studio.json
 
       - name: Smoke-test the packaged app
