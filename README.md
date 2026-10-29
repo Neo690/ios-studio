@@ -1,22 +1,34 @@
 # iOS studio
 
-A Windows application for building, signing and installing the iOS shell of
-[God's Eye View](https://github.com/Neo690/gods-eye-view) without a Mac.
+A Windows application for building, signing and installing iOS apps — without a
+Mac and without Xcode.
 
-It is a window around the project's own control panel: the page, the buttons and
-the commands are the ones `npm run ios:studio` serves inside that checkout. Only
-the delivery differs — no terminal to keep open, no browser tab, its own icon,
-and an installer.
+It puts one workflow behind a window: stage the app's web bundle, build an
+`.ipa`, verify what came out, sign it with an Apple ID, and install it on a
+phone over USB. The toolchain — WSL, Swift, the Darwin SDK, `xtool` — stays
+where it already is; this is the control surface in front of it, with its own
+icon, an installer and a desktop entry instead of a terminal and a browser tab.
+
+## What it drives
+
+This repository is the shell; a project is the work. The buttons run the
+project's own npm scripts — `build`, `ios:payload`, `ios:ipa` — and
+`xtool dev run` inside the folder you point it at, then read the archive back.
+That folder has to be an iOS project exposing those entry points. The one this
+was written for is [God's Eye View](https://github.com/Neo690/gods-eye-view):
+its iOS shell, bundle staging and `.ipa` inspection are what the panel shows, so
+the plist comparison names its app. A project exposing the same three scripts
+and an `ios/` folder gets the build, stage, `.ipa` and install buttons; the
+verify button is the one piece still written around that app's plist, and says
+so when it is handed another.
 
 ## What it needs
 
-This repository is the shell; the project lives elsewhere. The buttons run
-`npm run build`, `npm run ios:payload`, `npm run ios:ipa` and `xtool dev run`
-inside a God's Eye View checkout, so that checkout has to exist, with its
-`node_modules` installed, and `npm` on `PATH`.
+A checkout of that project with its `node_modules` installed, and `npm` on
+`PATH`.
 
-For the signing and install buttons the machine also needs what that project's
-[iOS notes](https://github.com/Neo690/gods-eye-view/blob/main/ios/README.md)
+For signing and installing, the machine also needs what
+[God's Eye View's iOS notes](https://github.com/Neo690/gods-eye-view/blob/main/ios/README.md)
 describe: WSL with the Swift toolchain, `xtool` and the Darwin SDK, an Apple ID
 session (`xtool auth login`) and an iPhone visible to WSL through `usbipd-win`.
 
@@ -30,11 +42,11 @@ npm install
 npm start
 ```
 
-The first launch asks for the checkout. It remembers the answer; **File ▸ Open
-project folder…** changes it later, and `--root=<path>` overrides both:
+The first launch asks for the project folder. It remembers the answer; **File ▸
+Open project folder…** changes it later, and `--root=<path>` overrides both:
 
 ```bash
-npx electron . --root "C:/path/to/gods-eye-view"
+npx electron . --root "C:/path/to/the-ios-project"
 ```
 
 ## Build the app and its installer

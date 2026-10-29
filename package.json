@@ -3,7 +3,7 @@
   "productName": "iOS studio",
   "version": "1.0.0",
   "private": true,
-  "description": "Standalone Windows window for the God's Eye View iOS studio panel: builds, signs and installs the iOS shell from a checkout.",
+  "description": "Windows app for building, signing and installing iOS apps without a Mac: a window over the xtool workflow, driven by a project checkout.",
   "main": "main.mjs",
   "type": "module",
   "license": "MIT",
